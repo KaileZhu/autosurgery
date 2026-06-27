@@ -30,6 +30,8 @@ MOTION_ALPHA = 0.62
 MOTION_LW = 1.35
 SLOPE_BAR_ALPHA = 0.72
 SLOPE_BAR_EDGE_LW = 1.0
+MIN_SPAN_LEN = 5
+MIN_SLOPE_BAR_RATIO = 0.06  # 区间步数占比低于此值不画斜率柱
 
 GRID = "#DEE2E6"
 SPINE = "#ADB5BD"
@@ -99,7 +101,77 @@ def motion_spans(motion, median):
     return spans
 
 
-MOTION_SPANS = motion_spans(state_values, motion_median)
+def merge_short_spans(spans, min_len=MIN_SPAN_LEN):
+    spans = list(spans)
+    if len(spans) <= 1:
+        return spans
+
+    while True:
+        lengths = [end - start for start, end, _ in spans]
+        min_length = min(lengths)
+        if min_length >= min_len:
+            break
+
+        idx = lengths.index(min_length)
+        start, end, _ = spans[idx]
+
+        if idx == 0:
+            next_start, next_end, next_high = spans[1]
+            spans[1] = (start, next_end, next_high)
+            spans.pop(0)
+        elif idx == len(spans) - 1:
+            prev_start, _, prev_high = spans[idx - 1]
+            spans[idx - 1] = (prev_start, end, prev_high)
+            spans.pop(idx)
+        else:
+            prev_len = spans[idx - 1][1] - spans[idx - 1][0]
+            next_len = spans[idx + 1][1] - spans[idx + 1][0]
+            if prev_len >= next_len:
+                prev_start, _, prev_high = spans[idx - 1]
+                spans[idx - 1] = (prev_start, end, prev_high)
+                spans.pop(idx)
+            else:
+                next_start, next_end, next_high = spans[idx + 1]
+                spans[idx + 1] = (start, next_end, next_high)
+                spans.pop(idx)
+
+    return spans
+
+
+def merge_adjacent_spans(spans):
+    if not spans:
+        return spans
+
+    merged = [spans[0]]
+    for start, end, is_high in spans[1:]:
+        prev_start, prev_end, prev_high = merged[-1]
+        if is_high == prev_high:
+            merged[-1] = (prev_start, end, prev_high)
+        else:
+            merged.append((start, end, is_high))
+    return merged
+
+
+def spans_for_slope_bars(spans, total_steps):
+    if not spans:
+        return spans
+
+    filtered = []
+    for start, end, is_high in spans:
+        span_len = end - start
+        if span_len < MIN_SPAN_LEN:
+            continue
+        if span_len / total_steps < MIN_SLOPE_BAR_RATIO:
+            continue
+        filtered.append((start, end, is_high))
+    return filtered
+
+
+MOTION_SPANS = merge_adjacent_spans(
+    merge_short_spans(
+        motion_spans(state_values, motion_median)
+    )
+)
 
 
 def draw_motion_background(ax, spans):
@@ -119,7 +191,7 @@ def draw_slope_bars(ax, gt_slope, pred_slope, spans, with_labels):
     gt_label_done = False
     pred_label_done = False
 
-    spans_to_draw = spans[:-1] if len(spans) > 1 else spans
+    spans_to_draw = spans_for_slope_bars(spans, steps)
 
     gt_means = [np.mean(gt_slope[s:e]) for s, e, _ in spans_to_draw]
     pred_means = [np.mean(pred_slope[s:e]) for s, e, _ in spans_to_draw]
