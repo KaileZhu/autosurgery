@@ -6,10 +6,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib import rcParams
-
-TRAJECTORY_IDS = (0, 1, 17, 18, 19,)
+TRAJECTORY_IDS = (17, 18, 19)
+MODELS = ("ABCP",)
 DATA_DIR = Path(__file__).parent / "trajectory"
 ACTION_X_AXIS = 0
+FUSION_K = 0.03
 
 # ==================================
 # 样式
@@ -17,12 +18,12 @@ ACTION_X_AXIS = 0
 
 COLORS = {
     "gt": "#1A5276",
-    "pred": "#D95D39",
-    "pred_compare": "#2E7D32",
+    "pred_csv": "#D95D39",
+    "pred_fused": "#2E7D32",
     "motion": "#6E6A7A",
     "gt_slope": "#C5DBEA",
-    "pred_slope": "#F3D4B8",
-    "pred_compare_slope": "#B7DFC5",
+    "pred_csv_slope": "#F3D4B8",
+    "pred_fused_slope": "#B7DFC5",
 }
 BG_HIGH = "#FFECE8"
 BG_LOW = "#EDF4FA"
@@ -45,6 +46,8 @@ MOTION_LABELS = {
     "motion": "Tissue respiratory motion",
     "motion_0": "Tissue motion 0",
     "motion_1": "Tissue respiratory motion",
+    "state_0": "Tissue state 0",
+    "state_1": "Tissue respiratory motion",
 }
 
 rcParams.update(
@@ -61,29 +64,61 @@ rcParams.update(
 )
 
 
-DEFAULT_COMPARE: dict[int, int] = {}
-
-
 @dataclass
 class TrajectoryData:
-    traj_id: int
+    label: str
     df: pd.DataFrame
     steps: int
     gt: np.ndarray
-    pred: np.ndarray
-    motion_cols: list[str]
+    pred_csv: np.ndarray
+    signal_cols: list[str]
     motion_values: np.ndarray
     motion_spans: list[tuple[int, int, bool]]
-    compare_traj_id: int | None = None
-    pred_compare: np.ndarray | None = None
+    pred_fused: np.ndarray | None = None
+    fused_only: bool = False
 
 
-def csv_path_for_traj(traj_id: int) -> Path:
-    return DATA_DIR / f"trajectory_{traj_id}_plot.csv"
+def csv_path_for_run(traj_id: int, model: str) -> Path:
+    return DATA_DIR / str(traj_id) / f"{model}.csv"
 
 
-def output_path_for_traj(traj_id: int) -> Path:
-    return DATA_DIR / f"trajectory_{traj_id}_action_x.png"
+def output_path_for_run(traj_id: int, model: str) -> Path:
+    return DATA_DIR / str(traj_id) / f"{model}.png"
+
+
+def npy_path_for_run(traj_id: int, model: str) -> Path:
+    return DATA_DIR / str(traj_id) / f"{model}.npy"
+
+
+def pred_from_chunk_fusion(chunk_data: np.ndarray, k: float = FUSION_K) -> np.ndarray:
+    """对 chunk 预测做指数加权时间融合，返回 (steps, action_dim)。"""
+    steps, chunk_horizon, action_dim = chunk_data.shape
+    all_time_actions = np.zeros(
+        (steps, steps + chunk_horizon, action_dim),
+        dtype=chunk_data.dtype,
+    )
+    for step_count in range(steps):
+        all_time_actions[
+            step_count, step_count : step_count + chunk_horizon
+        ] = chunk_data[step_count]
+
+    pred_action_across_time = []
+    for step_count in range(steps):
+        actions_for_curr_step = all_time_actions[:, step_count]
+        actions_populated = np.all(actions_for_curr_step != 0, axis=1)
+        actions_for_curr_step = actions_for_curr_step[actions_populated]
+        if len(actions_for_curr_step) == 0:
+            raise ValueError(f"时间步 {step_count} 没有可用的 chunk 动作")
+
+        exp_weights = np.exp(-k * np.arange(len(actions_for_curr_step)))
+        exp_weights = exp_weights / exp_weights.sum()
+        raw_action = np.sum(
+            actions_for_curr_step * exp_weights.reshape(-1, 1),
+            axis=0,
+        )
+        pred_action_across_time.append(raw_action)
+
+    return np.array(pred_action_across_time)
 
 
 def abs_slope(values):
@@ -246,33 +281,35 @@ def spans_for_slope_bars(spans, total_steps):
     return filtered
 
 
-def motion_plot_cols(df: pd.DataFrame) -> list[str]:
+def signal_plot_cols(df: pd.DataFrame) -> list[str]:
     if "motion" in df.columns:
         return ["motion"]
-    cols = sorted(c for c in df.columns if c.startswith("motion_"))
-    if cols:
-        return cols
+    motion_cols = sorted(c for c in df.columns if c.startswith("motion_"))
+    if motion_cols:
+        return motion_cols
+    state_cols = sorted(c for c in df.columns if c.startswith("state_"))
+    if state_cols:
+        return state_cols
     return []
 
 
-def primary_span_col(motion_cols: list[str]) -> str:
-    if "motion_1" in motion_cols:
-        return "motion_1"
-    if "motion" in motion_cols:
-        return "motion"
-    return motion_cols[0]
+def primary_span_col(signal_cols: list[str]) -> str:
+    for name in ("motion_1", "motion", "state_1", "state_0"):
+        if name in signal_cols:
+            return name
+    return signal_cols[0]
 
 
 def trim_trailing_invalid_rows(df: pd.DataFrame) -> pd.DataFrame:
     """去掉末尾无效行（如 NaN 填充），避免右侧出现空白绘图区域。"""
-    motion_cols = motion_plot_cols(df)
-    if not motion_cols:
-        raise ValueError("CSV 缺少 motion 列")
+    signal_cols = signal_plot_cols(df)
+    if not signal_cols:
+        raise ValueError("CSV 缺少 motion 或 state_* 列")
 
     required_cols = [
         f"gt_action_{ACTION_X_AXIS}",
         f"pred_action_{ACTION_X_AXIS}",
-        *motion_cols,
+        *signal_cols,
     ]
     missing = [col for col in required_cols if col not in df.columns]
     if missing:
@@ -289,41 +326,108 @@ def trim_trailing_invalid_rows(df: pd.DataFrame) -> pd.DataFrame:
     return df.iloc[: last_valid + 1].reset_index(drop=True)
 
 
-def load_trajectory(traj_id: int, compare_traj_id: int | None = None) -> TrajectoryData:
-    csv_path = csv_path_for_traj(traj_id)
-    if not csv_path.is_file():
-        raise FileNotFoundError(f"未找到数据文件: {csv_path}")
+def build_trajectory_data(
+    df: pd.DataFrame,
+    csv_path: Path,
+    label: str,
+    use_fusion: bool,
+    npy_path: Path | None,
+    fused_only: bool = False,
+) -> TrajectoryData:
+    signal_cols = signal_plot_cols(df)
+    if not signal_cols:
+        raise ValueError(f"{csv_path} 中缺少 motion 或 state_* 列")
 
-    df = trim_trailing_invalid_rows(pd.read_csv(csv_path))
-    motion_cols = motion_plot_cols(df)
-    if not motion_cols:
-        raise ValueError(f"{csv_path} 中缺少 motion 列")
+    pred_fused = None
+    if use_fusion or fused_only:
+        if npy_path is None:
+            raise ValueError("启用 --fuse / --fused-only 时必须提供对应的 .npy 文件")
+        if not npy_path.is_file():
+            raise FileNotFoundError(f"未找到 chunk 数据文件: {npy_path}")
 
-    span_col = primary_span_col(motion_cols)
+        chunk_data = np.load(npy_path)
+        if chunk_data.shape[0] != len(df):
+            raise ValueError(
+                f"CSV 行数 ({len(df)}) 与 npy 步数 ({chunk_data.shape[0]}) 不一致: "
+                f"{csv_path.name} / {npy_path.name}"
+            )
+
+        pred_fused_all = pred_from_chunk_fusion(chunk_data)
+        if pred_fused_all.shape[1] <= ACTION_X_AXIS:
+            raise ValueError(f"{npy_path} 的 action 维度不足以绘制 action x")
+        pred_fused = pred_fused_all[:, ACTION_X_AXIS]
+
+    span_col = primary_span_col(signal_cols)
     motion_values = df[span_col].values
     motion_spans = finalize_motion_spans(
         motion_spans_from_extrema(motion_values)
     )
 
-    pred_compare = None
-    if compare_traj_id is not None:
-        compare_path = csv_path_for_traj(compare_traj_id)
-        if not compare_path.is_file():
-            raise FileNotFoundError(f"未找到对比数据文件: {compare_path}")
-        compare_df = trim_trailing_invalid_rows(pd.read_csv(compare_path))
-        pred_compare = compare_df[f"pred_action_{ACTION_X_AXIS}"].values
-
     return TrajectoryData(
-        traj_id=traj_id,
+        label=label,
         df=df,
         steps=len(df),
         gt=df[f"gt_action_{ACTION_X_AXIS}"].values,
-        pred=df[f"pred_action_{ACTION_X_AXIS}"].values,
-        motion_cols=motion_cols,
+        pred_csv=df[f"pred_action_{ACTION_X_AXIS}"].values,
+        signal_cols=signal_cols,
         motion_values=motion_values,
         motion_spans=motion_spans,
-        compare_traj_id=compare_traj_id,
-        pred_compare=pred_compare,
+        pred_fused=pred_fused,
+        fused_only=fused_only,
+    )
+
+
+def load_trajectory(
+    traj_id: int,
+    model: str,
+    use_fusion: bool = False,
+    fused_only: bool = False,
+) -> TrajectoryData:
+    csv_path = csv_path_for_run(traj_id, model)
+    if not csv_path.is_file():
+        raise FileNotFoundError(f"未找到数据文件: {csv_path}")
+
+    df = trim_trailing_invalid_rows(pd.read_csv(csv_path))
+    need_npy = use_fusion or fused_only
+    npy_path = npy_path_for_run(traj_id, model) if need_npy else None
+    return build_trajectory_data(
+        df, csv_path, model, use_fusion, npy_path, fused_only=fused_only
+    )
+
+
+def infer_npy_path_for_csv(csv_path: Path) -> Path | None:
+    """推断与 plot CSV 配对的 chunk npy，如 trajectory_1_plot.csv -> trajectory_1_chunk.npy。"""
+    stem = csv_path.stem
+    candidates = []
+    if stem.endswith("_plot"):
+        candidates.append(csv_path.with_name(stem.replace("_plot", "_chunk") + ".npy"))
+    candidates.extend(
+        [
+            csv_path.with_name(stem + "_chunk.npy"),
+            csv_path.with_suffix(".npy"),
+        ]
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def load_trajectory_csv(
+    csv_path: Path,
+    use_fusion: bool = False,
+    npy_path: Path | None = None,
+    fused_only: bool = False,
+) -> TrajectoryData:
+    if not csv_path.is_file():
+        raise FileNotFoundError(f"未找到数据文件: {csv_path}")
+
+    if (use_fusion or fused_only) and npy_path is None:
+        npy_path = infer_npy_path_for_csv(csv_path)
+
+    df = trim_trailing_invalid_rows(pd.read_csv(csv_path))
+    return build_trajectory_data(
+        df, csv_path, csv_path.stem, use_fusion, npy_path, fused_only=fused_only
     )
 
 
@@ -473,13 +577,6 @@ def expand_ylim_for_slope_bars(ax, bottom_ratio=0.32):
     ax.set_ylim(ymin - extra, ymax)
 
 
-def pred_label_for(traj_id: int, role: str, with_traj_suffix: bool) -> str:
-    if not with_traj_suffix:
-        return "pred action" if role == "action" else "pred action slope"
-    suffix = f" ({traj_id})"
-    return f"pred action{suffix}" if role == "action" else f"pred action slope{suffix}"
-
-
 def plot_action_x(
     ax,
     data: TrajectoryData,
@@ -499,57 +596,77 @@ def plot_action_x(
         label=lbl("gt action"),
         zorder=5,
     )
-    has_compare = data.pred_compare is not None and data.compare_traj_id is not None
 
-    ax.plot(
-        data.pred,
-        color=COLORS["pred"],
-        linewidth=2.2,
-        alpha=0.95,
-        label=lbl(pred_label_for(data.traj_id, "action", has_compare)),
-        zorder=4,
-    )
-    if has_compare:
-        compare_len = len(data.pred_compare)
+    if data.fused_only:
+        if data.pred_fused is None:
+            raise ValueError("fused_only 模式需要融合 pred，请使用 --fuse 或 --fused-only")
         ax.plot(
-            np.arange(compare_len),
-            data.pred_compare,
-            color=COLORS["pred_compare"],
+            data.pred_fused,
+            color=COLORS["pred_csv"],
             linewidth=2.2,
             alpha=0.95,
-            label=lbl(pred_label_for(data.compare_traj_id, "action", True)),
+            label=lbl("pred action"),
             zorder=4,
         )
+        pred_series = [
+            (
+                abs_slope(data.pred_fused),
+                COLORS["pred_csv_slope"],
+                COLORS["pred_csv"],
+                "pred action slope",
+            ),
+        ]
+    else:
+        ax.plot(
+            data.pred_csv,
+            color=COLORS["pred_csv"],
+            linewidth=2.2,
+            alpha=0.95,
+            label=lbl(
+                "pred action (csv)" if data.pred_fused is not None else "pred action"
+            ),
+            zorder=4,
+        )
+        pred_series = [
+            (
+                abs_slope(data.pred_csv),
+                COLORS["pred_csv_slope"],
+                COLORS["pred_csv"],
+                "pred action slope (csv)"
+                if data.pred_fused is not None
+                else "pred action slope",
+            ),
+        ]
+        if data.pred_fused is not None:
+            ax.plot(
+                data.pred_fused,
+                color=COLORS["pred_fused"],
+                linewidth=2.2,
+                alpha=0.95,
+                label=lbl("pred action (fused)"),
+                zorder=4,
+            )
+            pred_series.append(
+                (
+                    abs_slope(data.pred_fused),
+                    COLORS["pred_fused_slope"],
+                    COLORS["pred_fused"],
+                    "pred action slope (fused)",
+                )
+            )
 
     gt_slope = abs_slope(data.gt)
-    pred_series = [
-        (
-            abs_slope(data.pred),
-            COLORS["pred_slope"],
-            COLORS["pred"],
-            pred_label_for(data.traj_id, "slope", has_compare),
-        )
-    ]
-    if has_compare:
-        pred_series.append(
-            (
-                abs_slope(data.pred_compare),
-                COLORS["pred_compare_slope"],
-                COLORS["pred_compare"],
-                pred_label_for(data.compare_traj_id, "slope", True),
-            )
-        )
 
     ax2 = ax.twinx()
 
-    for motion_col in data.motion_cols:
+    for signal_col in data.signal_cols:
         ax2.plot(
-            data.df[motion_col].values,
+            data.df[signal_col].values,
             color=COLORS["motion"],
             linewidth=MOTION_LW,
             linestyle=(0, (5, 4)),
             alpha=MOTION_ALPHA,
-            label=lbl(MOTION_LABELS.get(motion_col, motion_col)),
+            label=lbl(MOTION_LABELS.get(signal_col, signal_col)),
             zorder=2,
         )
 
@@ -581,12 +698,14 @@ def render_figure(data: TrajectoryData, output_path: Path):
                 legend_handles.append(handle)
                 legend_labels.append(label)
 
+    legend_ncol = min(len(legend_labels), 5)
+
     fig.legend(
         legend_handles,
         legend_labels,
         loc="lower center",
         bbox_to_anchor=(0.5, 0.97),
-        ncol=4,
+        ncol=legend_ncol,
         frameon=True,
         framealpha=0.95,
         facecolor="white",
@@ -611,45 +730,89 @@ def render_figure(data: TrajectoryData, output_path: Path):
 
 def parse_args():
     id_help = ", ".join(str(t) for t in TRAJECTORY_IDS)
+    model_help = ", ".join(MODELS)
     parser = argparse.ArgumentParser(
-        description="根据轨迹编号绘制 trajectory action x 图"
+        description="绘制 action x 图；默认仅用 CSV pred，--fuse 时叠加 chunk k 融合 pred"
     )
     parser.add_argument(
         "traj_id",
+        nargs="?",
         type=int,
         choices=TRAJECTORY_IDS,
-        help=f"轨迹编号，可选: {id_help}",
+        help=f"轨迹编号（与 model 搭配），可选: {id_help}",
+    )
+    parser.add_argument(
+        "model",
+        nargs="?",
+        choices=MODELS,
+        help=f"模型名称（与 traj_id 搭配），可选: {model_help}",
+    )
+    parser.add_argument(
+        "--csv",
+        type=Path,
+        default=None,
+        help="直接指定 CSV 路径，如 trajectory/19/trajectory_1_plot.csv",
+    )
+    parser.add_argument(
+        "--npy",
+        type=Path,
+        default=None,
+        help="chunk npy 路径；--fuse 时可省略，将自动查找同目录 *_chunk.npy",
+    )
+    parser.add_argument(
+        "--fuse",
+        action="store_true",
+        help="从 npy 做 k 指数权重融合，并与 CSV pred 同时绘制",
+    )
+    parser.add_argument(
+        "--fused-only",
+        action="store_true",
+        help="仅绘制 k 融合 pred（不画 CSV pred）",
     )
     parser.add_argument(
         "-o",
         "--output",
         type=Path,
         default=None,
-        help="输出 PNG 路径（默认写入 trajectory 目录）",
-    )
-    parser.add_argument(
-        "--compare",
-        type=int,
-        default=None,
-        choices=TRAJECTORY_IDS,
-        help="叠加对比轨迹的 pred action",
+        help="输出 PNG 路径",
     )
     return parser.parse_args()
 
 
-def resolve_compare_traj_id(traj_id: int, compare_arg: int | None) -> int | None:
-    if compare_arg is None:
-        return DEFAULT_COMPARE.get(traj_id)
-    if compare_arg == traj_id:
-        raise ValueError("对比轨迹不能与主轨迹相同")
-    return compare_arg
+def resolve_input(args):
+    use_fusion = args.fuse or args.fused_only
+    if args.fused_only and args.fuse:
+        raise SystemExit("--fuse 与 --fused-only 请二选一")
+
+    if args.csv is not None:
+        csv_path = args.csv
+        if not csv_path.is_absolute():
+            csv_path = (Path.cwd() / csv_path).resolve()
+        output_path = args.output or csv_path.with_suffix(".png")
+        data = load_trajectory_csv(
+            csv_path,
+            use_fusion=use_fusion,
+            npy_path=args.npy,
+            fused_only=args.fused_only,
+        )
+        return data, output_path
+
+    if args.traj_id is None or args.model is None:
+        raise SystemExit("请指定 traj_id 和 model，或使用 --csv 指定 CSV 文件")
+
+    output_path = args.output or output_path_for_run(args.traj_id, args.model)
+    data = load_trajectory(
+        args.traj_id,
+        args.model,
+        use_fusion=use_fusion,
+        fused_only=args.fused_only,
+    )
+    return data, output_path
 
 
 def main():
     args = parse_args()
-    compare_traj_id = resolve_compare_traj_id(args.traj_id, args.compare)
-    data = load_trajectory(args.traj_id, compare_traj_id=compare_traj_id)
-    output_path = args.output or output_path_for_traj(args.traj_id)
+    data, output_path = resolve_input(args)
     render_figure(data, output_path)
     print(f"已保存: {output_path}")
 

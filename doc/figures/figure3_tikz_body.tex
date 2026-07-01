@@ -1,0 +1,67 @@
+\begin{tikzpicture}[
+  node distance=8mm and 10mm,
+  every node/.style={font=\small}
+]
+
+% ===== 第一层：三个并行监测 =====
+\node[flow box, minimum width=26mm] (kfield)
+  {关键手术野\\判别结果 $K$};
+\node[flow box, minimum width=26mm, right=of kfield] (conf)
+  {任务分类\\置信度 $\{c_i\}$};
+\node[flow box, minimum width=26mm, right=of conf] (stagn)
+  {任务进度\\停滞检测 $p_j$};
+
+% ===== 第二层：判定菱形 =====
+\node[flow decision, below=of kfield, minimum width=16mm] (c1)
+  {$K$ 未充分\\暴露?};
+\node[flow decision, below=of conf, minimum width=16mm] (c2)
+  {全部 $c_i$\\$<\tau$?};
+\node[flow decision, below=of stagn, minimum width=16mm] (c3)
+  {连续 $N$ 周期\\$p_j$ 相同?};
+
+\draw[flow arrow] (kfield) -- (c1);
+\draw[flow arrow] (conf) -- (c2);
+\draw[flow arrow] (stagn) -- (c3);
+
+% ===== 对齐汇聚（同一水平线）=====
+\coordinate (merge) at ($(c2.south)+(0,-9mm)$);
+
+\draw[flow arrow] (c1.south) -- (c1.south |- merge);
+\draw[flow arrow] (c1.south |- merge) -- (merge);
+\draw[flow arrow] (c2.south) -- (merge);
+\draw[flow arrow] (c3.south) -- (c3.south |- merge);
+\draw[flow arrow] (c3.south |- merge) -- (merge);
+
+% ===== 主列：自上而下 =====
+\node[flow box, minimum width=44mm, align=center] (trigger)
+  at ($(merge)+(0,-15mm)$)
+  {异常事件触发\\[-1pt]
+   $\Psi = \lnot K \lor \bigl(\bigwedge_i c_i < \tau\bigr) \lor \Delta p_j$};
+
+\draw[flow arrow] (merge) -- (trigger.north);
+
+\node[flow decision, below=8mm of trigger, minimum width=16mm] (dec)
+  {触发\\异常?};
+
+\draw[flow arrow] (trigger) -- (dec);
+
+\node[flow box, minimum width=30mm, below=8mm of dec] (monitor)
+  {继续监测};
+
+\draw[flow arrow] (dec) -- node[flow label, right] {否} (monitor);
+
+% ===== 是：右侧三路并行输出 =====
+\node[flow box, minimum width=28mm, right=16mm of dec, yshift=10mm] (out1)
+  {人工接管指令};
+\node[flow box, minimum width=28mm, right=16mm of dec] (out2)
+  {异常类型判别};
+\node[flow box, minimum width=28mm, right=16mm of dec, yshift=-10mm] (out3)
+  {进入异常\\恢复图};
+
+\coordinate (split) at ($(dec.east)+(5mm,0)$);
+\draw[flow arrow] (dec.east) -- node[flow label, above] {是} (split);
+\draw[flow arrow] (split) |- node[flow label, pos=0.25, above] {$\lnot K$} (out1.west);
+\draw[flow arrow] (split) -- node[flow label, above] {$c_i<\tau$} (out2.west);
+\draw[flow arrow] (split) |- node[flow label, pos=0.25, below] {$\Delta p_j$} (out3.west);
+
+\end{tikzpicture}

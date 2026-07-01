@@ -1,0 +1,75 @@
+\begin{tikzpicture}[
+  node distance=7mm and 14mm,
+  every node/.style={font=\small}
+]
+
+% --- Left: parallel mapping inputs ---
+\node[flow box, minimum width=32mm] (atype)
+  {异常类型};
+\node[flow box, minimum width=32mm, below=6mm of atype] (task)
+  {当前执行任务};
+\node[flow box, minimum width=32mm, below=6mm of task] (loc)
+  {异常发生位置};
+
+% --- Mapping hub ---
+\node[flow box, minimum width=36mm, right=20mm of task] (map)
+  {异常恢复图\\恢复技能选择};
+
+\draw[flow arrow] (atype.east) -- (map.west |- atype.east);
+\draw[flow arrow] (task) -- (map);
+\draw[flow arrow] (loc.east) -- (map.west |- loc.east);
+
+% --- Main vertical flow (center column) ---
+\node[flow decision, below=14mm of map, minimum width=20mm] (skilldec)
+  {选择\\恢复技能?};
+
+\draw[flow arrow] (map) -- (skilldec);
+
+\node[flow box, minimum width=38mm, below=10mm of skilldec] (done)
+  {恢复动作完成};
+
+\draw[flow arrow] (skilldec) -- (done);
+
+\node[flow decision, below=8mm of done, minimum width=20mm] (reeval)
+  {重新评估\\$\Psi$?};
+
+\draw[flow arrow] (done) -- (reeval);
+
+% --- Bottom: success path ---
+\node[flow box, minimum width=36mm, below=10mm of reeval] (ret)
+  {返回异常发生前\\正常任务节点};
+
+\draw[flow arrow] (reeval.south) -- node[flow label, right] {$\lnot\Psi$} (ret);
+
+% --- Right column: recovery skills ---
+\node[flow box, minimum width=34mm, right=26mm of skilldec, yshift=14mm] (vs)
+  {视觉伺服\\恢复技能};
+\node[flow box, minimum width=34mm, right=26mm of skilldec] (act)
+  {预训练动作块\\转换器恢复技能};
+\node[flow box, minimum width=34mm, right=26mm of skilldec, yshift=-14mm] (manual)
+  {人工接管\\指令};
+
+\draw[flow arrow] (skilldec.east) -- ++(8mm,0) |- (vs.west);
+\draw[flow arrow] (skilldec.east) -- ++(8mm,0) |- (act.west);
+\draw[flow arrow] (skilldec.east) -- ++(8mm,0) |- (manual.west);
+
+\draw[flow arrow] (vs.south) -- ++(0,-4mm) -| (done.north);
+\draw[flow arrow] (act.south) -- ++(0,-4mm) -| (done.north);
+\draw[flow arrow] (manual.south) -- ++(0,-4mm) -| (done.north);
+
+% --- Right branch: continue / takeover ---
+\node[flow box, minimum width=32mm, right=28mm of reeval] (cont)
+  {继续恢复\\流程};
+\node[flow box, minimum width=32mm, below=6mm of cont] (takeover)
+  {发起\\人工接管};
+
+\draw[flow arrow] (reeval.east) -- node[flow label, above] {$\Psi$, $<M$} (cont.west);
+\draw[flow arrow] (cont) -- node[flow label, right] {$\geq M$} (takeover);
+
+% --- Feedback loop ---
+\draw[flow arrow]
+  (cont.east) -- ++(12mm,0) coordinate (loopR)
+  -- (loopR |- map.east)
+  -- node[flow label, pos=0.4, right] {重选恢复技能} (map.east);
+
+\end{tikzpicture}

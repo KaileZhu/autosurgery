@@ -1,0 +1,61 @@
+% Patent flowchart style (matching Fig.1 & Fig.2 in the document)
+\ProvidesPackage{nature_style}
+\RequirePackage{tikz}
+
+\usetikzlibrary{
+  arrows.meta,
+  positioning,
+  shapes.geometric,
+  calc,
+  fit,
+  backgrounds
+}
+
+\tikzset{
+  flow box/.style={
+    rectangle,
+    draw=black,
+    fill=white,
+    line width=0.6pt,
+    minimum width=34mm,
+    minimum height=11mm,
+    align=center,
+    font=\small,
+    inner sep=4pt
+  },
+  flow start/.style={
+    flow box,
+    rounded corners=2.5mm
+  },
+  flow decision/.style={
+    diamond,
+    aspect=2.2,
+    draw=black,
+    fill=white,
+    line width=0.6pt,
+    align=center,
+    font=\small,
+    inner sep=0.5pt
+  },
+  flow arrow/.style={
+    ->,
+    >=latex,
+    line width=0.6pt,
+    draw=black
+  },
+  flow arrow dashed/.style={
+    flow arrow,
+    dashed
+  },
+  flow label/.style={
+    font=\small,
+    fill=white,
+    inner sep=1pt
+  },
+  flow note/.style={
+    font=\footnotesize,
+    align=left
+  }
+}
+
+\endinput

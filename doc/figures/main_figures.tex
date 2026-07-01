@@ -1,0 +1,32 @@
+% Main document: compile both figures with captions
+% Compile: xelatex main_figures.tex
+\documentclass[11pt,a4paper]{article}
+\usepackage{ctex}
+\usepackage{nature_style}
+\usepackage{amsmath}
+\usepackage{subcaption}
+\usepackage[margin=20mm]{geometry}
+\usepackage{graphicx}
+
+\title{异常判别与异常恢复图}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{figure}[htbp]
+  \centering
+  \input{figure3_tikz_body.tex}
+  \caption{异常判别逻辑流程图。示出关键手术野判别结果、任务分类置信度、任务进度停滞检测与异常事件触发条件之间的判定逻辑；触发后根据异常来源进行分流处理。}
+  \label{fig:anomaly-logic}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figure4_tikz_body.tex}
+  \caption{异常恢复图。示出异常类型、当前执行任务、异常发生位置与视觉伺服恢复技能、预训练动作块转换器恢复技能及人工接管指令之间的映射关系，以及恢复动作完成后的重新评估流程。}
+  \label{fig:anomaly-recovery}
+\end{figure}
+
+\end{document}
