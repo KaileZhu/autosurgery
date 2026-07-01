@@ -41,9 +41,10 @@ MIN_SLOPE_BAR_RATIO = 0.06
 GRID = "#DEE2E6"
 SPINE = "#ADB5BD"
 
-STATE_LABELS = {
-    "state_0": "Tissue state 0",
-    "state_1": "Tissue respiratory motion",
+MOTION_LABELS = {
+    "motion": "Tissue respiratory motion",
+    "motion_0": "Tissue motion 0",
+    "motion_1": "Tissue respiratory motion",
 }
 
 rcParams.update(
@@ -70,7 +71,7 @@ class TrajectoryData:
     steps: int
     gt: np.ndarray
     pred: np.ndarray
-    state_cols: list[str]
+    motion_cols: list[str]
     motion_values: np.ndarray
     motion_spans: list[tuple[int, int, bool]]
     compare_traj_id: int | None = None
@@ -245,18 +246,33 @@ def spans_for_slope_bars(spans, total_steps):
     return filtered
 
 
-def primary_motion_col(state_cols: list[str]) -> str:
-    if "state_1" in state_cols:
-        return "state_1"
-    return state_cols[0]
+def motion_plot_cols(df: pd.DataFrame) -> list[str]:
+    if "motion" in df.columns:
+        return ["motion"]
+    cols = sorted(c for c in df.columns if c.startswith("motion_"))
+    if cols:
+        return cols
+    return []
+
+
+def primary_span_col(motion_cols: list[str]) -> str:
+    if "motion_1" in motion_cols:
+        return "motion_1"
+    if "motion" in motion_cols:
+        return "motion"
+    return motion_cols[0]
 
 
 def trim_trailing_invalid_rows(df: pd.DataFrame) -> pd.DataFrame:
     """去掉末尾无效行（如 NaN 填充），避免右侧出现空白绘图区域。"""
+    motion_cols = motion_plot_cols(df)
+    if not motion_cols:
+        raise ValueError("CSV 缺少 motion 列")
+
     required_cols = [
         f"gt_action_{ACTION_X_AXIS}",
         f"pred_action_{ACTION_X_AXIS}",
-        *sorted(c for c in df.columns if c.startswith("state_")),
+        *motion_cols,
     ]
     missing = [col for col in required_cols if col not in df.columns]
     if missing:
@@ -279,12 +295,12 @@ def load_trajectory(traj_id: int, compare_traj_id: int | None = None) -> Traject
         raise FileNotFoundError(f"未找到数据文件: {csv_path}")
 
     df = trim_trailing_invalid_rows(pd.read_csv(csv_path))
-    state_cols = sorted(c for c in df.columns if c.startswith("state_"))
-    if not state_cols:
-        raise ValueError(f"{csv_path} 中缺少 state_* 列")
+    motion_cols = motion_plot_cols(df)
+    if not motion_cols:
+        raise ValueError(f"{csv_path} 中缺少 motion 列")
 
-    motion_col = primary_motion_col(state_cols)
-    motion_values = df[motion_col].values
+    span_col = primary_span_col(motion_cols)
+    motion_values = df[span_col].values
     motion_spans = finalize_motion_spans(
         motion_spans_from_extrema(motion_values)
     )
@@ -303,7 +319,7 @@ def load_trajectory(traj_id: int, compare_traj_id: int | None = None) -> Traject
         steps=len(df),
         gt=df[f"gt_action_{ACTION_X_AXIS}"].values,
         pred=df[f"pred_action_{ACTION_X_AXIS}"].values,
-        state_cols=state_cols,
+        motion_cols=motion_cols,
         motion_values=motion_values,
         motion_spans=motion_spans,
         compare_traj_id=compare_traj_id,
@@ -526,14 +542,14 @@ def plot_action_x(
 
     ax2 = ax.twinx()
 
-    for state_col in data.state_cols:
+    for motion_col in data.motion_cols:
         ax2.plot(
-            data.df[state_col].values,
+            data.df[motion_col].values,
             color=COLORS["motion"],
             linewidth=MOTION_LW,
             linestyle=(0, (5, 4)),
             alpha=MOTION_ALPHA,
-            label=lbl(STATE_LABELS.get(state_col, state_col)),
+            label=lbl(MOTION_LABELS.get(motion_col, motion_col)),
             zorder=2,
         )
 
