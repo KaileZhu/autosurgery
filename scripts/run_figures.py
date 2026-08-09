@@ -15,20 +15,20 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-SCRIPTS = {
-    "B": "figure_B_tissue_motion.py",
-    "C": "figure_C_3d_trajectories.py",
-    "D": "figure_D_motion_phase_velocity.py",
-    "DE": "figure_DE_actionx_phase_velocity.py",
-    "E": "figure_E_actionx_pairwise.py",
-    "CE": "figure_CE_trajectory_actionx_1x2.py",
+MODULES = {
+    "B": "scripts.figures.figure_b_tissue_motion",
+    "C": "scripts.figures.figure_c_3d_trajectories",
+    "D": "scripts.figures.figure_d_motion_phase_velocity",
+    "DE": "scripts.figures.figure_de_actionx_phase_velocity",
+    "E": "scripts.figures.figure_e_actionx_pairwise",
+    "CE": "scripts.figures.figure_ce_trajectory_actionx_1x2",
 }
 DEFAULT_FIGURES = ("B", "C", "DE", "D", "E")
 TRIALS = (17, 18, 19)
 
 
 def command_for(figure: str, trial: int) -> list[str]:
-    return [sys.executable, str(ROOT / "scripts" / SCRIPTS[figure]), "--trial", str(trial)]
+    return [sys.executable, "-m", MODULES[figure], "--trial", str(trial)]
 
 
 def parse_args() -> argparse.Namespace:
@@ -36,7 +36,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--figures",
         nargs="+",
-        choices=tuple(SCRIPTS),
+        choices=tuple(MODULES),
         default=list(DEFAULT_FIGURES),
         help="figure groups to render (default: B C DE D E)",
     )

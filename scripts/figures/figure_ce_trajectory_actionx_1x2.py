@@ -19,9 +19,9 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from matplotlib.ticker import LinearLocator, MaxNLocator, NullFormatter, ScalarFormatter
 
-import figure_C_3d_trajectories as trajectory
-import figure_D_motion_phase_velocity as phase
-import figure_E_actionx_pairwise as actionx
+from . import figure_c_3d_trajectories as trajectory
+from . import figure_d_motion_phase_velocity as phase
+from . import figure_e_actionx_pairwise as actionx
 
 
 MODEL_KEYS = tuple(trajectory.MODEL_FILES)

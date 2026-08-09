@@ -15,7 +15,7 @@ from matplotlib import rcParams
 
 
 HERE = Path(__file__).resolve().parent
-ROOT = HERE.parent
+ROOT = HERE.parents[1]
 DEFAULT_OUTPUT = ROOT / "figures" / "output_probability_broken_bar.png"
 
 LABELS = ("CVS achieved", "CVS not achieved")

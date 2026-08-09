@@ -1,6 +1,6 @@
 """Generate the merged Action-X / respiratory-phase / mean-velocity panel.
 
-This is the former right-hand panel of ``figure_CE_trajectory_actionx_1x2.py``
+This is the former right-hand panel of ``figure_ce_trajectory_actionx_1x2.py``
 drawn on its own canvas, so the 3D trajectory (Figure C) and this panel are two
 separate figures.  One axes carries three layers:
 
@@ -8,10 +8,10 @@ separate figures.  One axes carries three layers:
 * inspiration / expiration bands behind them,
 * per-phase mean absolute x velocity as grouped bars on a right-hand axis.
 
-Colors come from ``figure_C_3d_trajectories`` so both figures agree.
+Colors come from ``figure_c_3d_trajectories`` so both figures agree.
 
 Example:
-    python scripts/figure_DE_actionx_phase_velocity.py --all
+    python -m scripts.figures.figure_de_actionx_phase_velocity --all
 """
 
 from __future__ import annotations
@@ -28,9 +28,9 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from matplotlib.ticker import MaxNLocator, ScalarFormatter
 
-import figure_C_3d_trajectories as trajectory
-import figure_D_motion_phase_velocity as phase
-import figure_E_actionx_pairwise as actionx
+from . import figure_c_3d_trajectories as trajectory
+from . import figure_d_motion_phase_velocity as phase
+from . import figure_e_actionx_pairwise as actionx
 
 
 TRIAL_IDS = (17, 18, 19)

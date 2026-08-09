@@ -43,7 +43,7 @@ SANS = resolve_sans_family()
 
 
 HERE = Path(__file__).resolve().parent
-ROOT = HERE.parent
+ROOT = HERE.parents[1]
 DATA_DIR = ROOT / "data" / "trials"
 TRIAL_IDS = (17, 18, 19)
 

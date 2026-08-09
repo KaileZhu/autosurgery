@@ -29,10 +29,10 @@ except ImportError as exc:
         "`python -m pip install imageio-ffmpeg`."
     ) from exc
 
-from figure_B_tissue_motion import load_motion, trial_inputs_dir
+from ..figures.figure_b_tissue_motion import load_motion, trial_inputs_dir
 
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_TRIAL = 17
 
 

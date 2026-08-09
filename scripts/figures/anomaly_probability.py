@@ -17,7 +17,7 @@ from matplotlib import rcParams
 
 
 HERE = Path(__file__).resolve().parent
-ROOT = HERE.parent
+ROOT = HERE.parents[1]
 DEFAULT_OUTPUT = ROOT / "figures" / "anomaly_probability_broken_bar.png"
 
 DEFAULT_COLLISION = 0.983
