@@ -1,0 +1,4 @@
+# Keep frequently revised binary assets out of normal Git history.
+*.pptx filter=lfs diff=lfs merge=lfs -text
+*.pdf filter=lfs diff=lfs merge=lfs -text
+*.mp4 filter=lfs diff=lfs merge=lfs -text

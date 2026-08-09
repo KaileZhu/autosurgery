@@ -1,0 +1,19 @@
+﻿步骤,Step,表1卡住次数,表2卡住次数,合计卡住次数
+抓起胆囊,Grasp gallbladder,0,0,0
+上第1个夹子,Duct clip 1,6,4,10
+第1个夹子撤回,Duct clip 1 retract,2,2,4
+上第2个夹子,Duct clip 2,2,6,8
+第2个夹子撤回,Duct clip 2 retract,1,1,2
+上第3个夹子,Duct clip 3,0,5,5
+第3个夹子撤回,Duct clip 3 retract,0,0,0
+第1次剪切,Cut duct,0,0,0
+第1次剪切撤回,Cut duct retract,6,0,6
+上第4个夹子,Artery clip 1,0,2,2
+第4个夹子撤回,Artery clip 1 retract,1,1,2
+上第5个夹子,Artery clip 2,0,1,1
+第5个夹子撤回,Artery clip 2 retract,0,1,1
+上第6个夹子,Artery clip 3,0,3,3
+第6个夹子撤回,Artery clip 3 retract,1,1,2
+第2次剪切,Cut artery,2,0,2
+第2次剪切撤回,Cut artery retract,0,2,2
+合计,Total,21,29,50

@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Office / editor temp
+~$*
+*.tmp
+Thumbs.db
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Reproducible figure and video outputs
+data/trials/*/outputs/
+figures/palette_preview/
+*_with_tissue_motion.mp4
+*_phase_labels.mp4
