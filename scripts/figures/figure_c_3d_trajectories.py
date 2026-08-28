@@ -82,13 +82,19 @@ COLORS = {
 # A low camera keeps the box floor almost edge-on, which is what used to eat
 # the lower-left corner as an empty wedge.  The trajectory still runs from the
 # lower right up to the left, leaving the upper-right quadrant clear.
-DEFAULT_ELEV = 8.0
-DEFAULT_AZIM = -56.0
+DEFAULT_ELEV = 4.5
+DEFAULT_AZIM = -60.0
 LINEWIDTHS = {"GT": 1.95, "zeroshot": 0.95, "AB": 0.95, "ABC": 1.1, "ABCP": 1.4}
 
-# The panel is 8.8 in wide, so what reads as a comfortable size here is larger
-# than the 8.5 pt figure_DE uses on its 7 in canvas.
-FONT_SIZE = 11.5
+# Native output aspect ratio is one third wider than the former cropped PNG
+# (2130 x 1220).  Saving the complete canvas keeps this ratio deterministic
+# without stretching the rendered bitmap or distorting the 3D data box.
+FIG_WIDTH = 5.85
+FIG_HEIGHT = 3.35
+
+# The panel is wide, so what reads as a comfortable size here is larger than
+# the 8.5 pt figure_DE uses on its 7 in canvas.
+FONT_SIZE = 14.0
 
 # The tolerance sphere is centred on the demonstration endpoint and its radius
 # is the In vivo endpoint error, so it borrows that model's colour and follows
@@ -183,8 +189,9 @@ def style_3d_axes(ax: plt.Axes, trajectories: list[np.ndarray]) -> None:
 
     # Box dimensions proportional to data spans preserve equal physical scale
     # per action unit; the floor keeps shorter axes readable without flattening z.
-    box = spans / spans.max()
-    ax.set_box_aspect(np.maximum(box, 0.48))
+    box = np.maximum(spans / spans.max(), 0.48)
+    box[:2] *= 1.55
+    ax.set_box_aspect(box, zoom=1.75)
     ax.set_facecolor("white")
     for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
         axis.set_major_locator(MaxNLocator(nbins=4))
@@ -246,6 +253,7 @@ def draw_black_box_silhouette(ax: plt.Axes) -> None:
             color="black",
             lw=0.65,
             zorder=0.5,
+            clip_on=False,
         )
 
 
@@ -388,7 +396,7 @@ def add_view_aligned_axis_labels(
     )
     z_axis_anchor = z_axis_start + 0.67 * (z_axis_end - z_axis_start)
     z_rotation = 90.0
-    z_offset = np.array([0.035, 0.0])
+    z_offset = np.array([-0.035, 0.0])
 
     label_specs = (
         (x_axis_anchor, labels[0], x_offset, x_rotation),
@@ -708,9 +716,11 @@ def plot(
             )
         trajectories[label] = fuse_chunks(chunks, k=k)
 
-    fig = plt.figure(figsize=(8.8, 3.05))
+    fig = plt.figure(figsize=(FIG_WIDTH, FIG_HEIGHT))
     ax = fig.add_subplot(111, projection="3d", computed_zorder=False)
-    ax.set_position([0.015, 0.02, 0.97, 0.84])
+    # Keep a narrow safety inset so the projected black box silhouette remains
+    # fully inside the export even after tight whitespace cropping.
+    ax.set_position([0.02, 0.025, 0.96, 0.82])
 
     # Endpoint tolerance sphere: its radius is the ABC endpoint error, so ABC
     # lies on the boundary and better/worse endpoints fall inside/outside.
@@ -752,6 +762,7 @@ def plot(
         lw=LINEWIDTHS["GT"],
         label="Demonstration",
         zorder=10,
+        clip_on=False,
     )
     for label, trajectory in trajectories.items():
         ax.plot(
@@ -761,6 +772,7 @@ def plot(
             label=DISPLAY_LABELS[label],
             alpha=0.96,
             zorder=5 if label == "ABCP" else 3,
+            clip_on=False,
         )
         ax.scatter(
             *trajectory[-1, :3],
@@ -770,12 +782,13 @@ def plot(
             linewidth=0.45,
             depthshade=False,
             zorder=11,
+            clip_on=False,
         )
 
     ax.scatter(*gt[0], color="white", edgecolor=COLORS["GT"], linewidth=0.9,
-               s=22, marker="o", depthshade=False, zorder=12)
+               s=22, marker="o", depthshade=False, zorder=12, clip_on=False)
     ax.scatter(*gt[-1], color=COLORS["GT"], edgecolor="white", linewidth=0.55,
-               s=24, marker="o", depthshade=False, zorder=12)
+               s=24, marker="o", depthshade=False, zorder=12, clip_on=False)
     ax.text(*(gt[-1] + np.array([0.00018, -0.00005, 0.00002])), "End", fontsize=FONT_SIZE, color="#333333", zorder=13)
     ax.set_xlabel("")
     ax.set_ylabel("")
@@ -813,34 +826,24 @@ def plot(
     legend_kwargs = dict(
         loc="upper center",
         frameon=False,
-        handlelength=1.65,
-        handletextpad=0.42,
-        columnspacing=0.85,
+        fontsize=12.5,
+        handlelength=1.2,
+        handletextpad=0.3,
+        columnspacing=0.45,
         borderaxespad=0.0,
     )
-    # Two rows rather than one: at 11.5 pt a single row of five entries is the
-    # widest thing on the canvas and stretches the whole figure.  Split 3 + 2
-    # with two separate legends -- one legend with ncol=3 would fill column by
-    # column and scramble the model order.
-    first_row = fig.legend(
-        handles=handles[:3],
-        bbox_to_anchor=(0.52, 0.875),
-        ncol=3,
-        **legend_kwargs,
-    )
-    fig.add_artist(first_row)
     fig.legend(
-        handles=handles[3:],
-        bbox_to_anchor=(0.52, 0.805),
-        ncol=2,
+        handles=handles,
+        bbox_to_anchor=(0.5, 0.915),
+        ncol=5,
         **legend_kwargs,
     )
     fig.subplots_adjust(left=0.005, right=0.99, bottom=0.01, top=0.99)
 
     output.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output, dpi=dpi, bbox_inches="tight", pad_inches=0.01)
+    fig.savefig(output, dpi=dpi, facecolor="white")
     plt.close(fig)
-    trim_png_whitespace(output)
+    trim_png_whitespace(output, padding=20)
     print(f"Saved: {output}")
     if interactive_output is not None:
         save_interactive_plot(gt, trajectories, interactive_output)

@@ -20,6 +20,7 @@ MODULES = {
     "C": "scripts.figures.figure_c_3d_trajectories",
     "D": "scripts.figures.figure_d_motion_phase_velocity",
     "DE": "scripts.figures.figure_de_actionx_phase_velocity",
+    "BDE": "scripts.figures.figure_bde_tissue_motion_actionx_velocity",
     "E": "scripts.figures.figure_e_actionx_pairwise",
     "CE": "scripts.figures.figure_ce_trajectory_actionx_1x2",
 }
