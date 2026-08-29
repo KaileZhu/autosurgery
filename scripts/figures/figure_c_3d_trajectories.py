@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import io
+import re
 from pathlib import Path
 
 import matplotlib.colors as mcolors
@@ -190,7 +192,7 @@ def style_3d_axes(ax: plt.Axes, trajectories: list[np.ndarray]) -> None:
     # Box dimensions proportional to data spans preserve equal physical scale
     # per action unit; the floor keeps shorter axes readable without flattening z.
     box = np.maximum(spans / spans.max(), 0.48)
-    box[:2] *= 1.55
+    box[:2] *= 1.42
     ax.set_box_aspect(box, zoom=1.75)
     ax.set_facecolor("white")
     for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
@@ -668,6 +670,41 @@ def save_interactive_plot(
     print(f"Saved interactive: {output}")
 
 
+def crop_svg_to_content(
+    svg_path: Path, probe_png: io.BytesIO, probe_dpi: int, padding_in: float
+) -> None:
+    """Crop an SVG's viewBox to the rendered content plus a small border.
+
+    The content bounding box is measured on a rasterized probe of the same
+    figure, which sidesteps Matplotlib's unreliable 3D tight-bbox extents.
+    """
+    probe_png.seek(0)
+    image = Image.open(probe_png).convert("RGB")
+    background = Image.new("RGB", image.size, "white")
+    bbox = ImageChops.difference(image, background).getbbox()
+    if bbox is None:
+        return
+    left_in = max(bbox[0] / probe_dpi - padding_in, 0.0)
+    top_in = max(bbox[1] / probe_dpi - padding_in, 0.0)
+    right_in = min(bbox[2] / probe_dpi + padding_in, image.width / probe_dpi)
+    bottom_in = min(bbox[3] / probe_dpi + padding_in, image.height / probe_dpi)
+    x_pt, y_pt = left_in * 72.0, top_in * 72.0
+    w_pt, h_pt = (right_in - left_in) * 72.0, (bottom_in - top_in) * 72.0
+    text = svg_path.read_text(encoding="utf-8")
+    match = re.search(r"<svg[^>]*>", text)
+    if match is None:
+        return
+    tag = match.group(0)
+    new_tag = re.sub(r'width="[^"]*"', f'width="{w_pt:.3f}pt"', tag)
+    new_tag = re.sub(r'height="[^"]*"', f'height="{h_pt:.3f}pt"', new_tag)
+    new_tag = re.sub(
+        r'viewBox="[^"]*"',
+        f'viewBox="{x_pt:.3f} {y_pt:.3f} {w_pt:.3f} {h_pt:.3f}"',
+        new_tag,
+    )
+    svg_path.write_text(text.replace(tag, new_tag, 1), encoding="utf-8")
+
+
 def trim_png_whitespace(path: Path, padding: int = 28) -> None:
     """Crop excess white margins from a saved PNG while keeping a small border."""
     image = Image.open(path).convert("RGB")
@@ -743,6 +780,7 @@ def plot(
         antialiased=True,
         shade=False,
         zorder=1,
+        clip_on=False,
     )
     ax.plot_wireframe(
         sphere_x,
@@ -754,6 +792,7 @@ def plot(
         alpha=SPHERE_EDGE_ALPHA,
         linewidth=0.35,
         zorder=2,
+        clip_on=False,
     )
 
     ax.plot(
@@ -841,9 +880,20 @@ def plot(
     fig.subplots_adjust(left=0.005, right=0.99, bottom=0.01, top=0.99)
 
     output.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output, dpi=dpi, facecolor="white")
-    plt.close(fig)
-    trim_png_whitespace(output, padding=20)
+    if output.suffix.lower() == ".svg":
+        # bbox_inches="tight" miscomputes 3D artist extents and can clip the
+        # tolerance sphere, so save the full canvas and crop the SVG viewBox
+        # using the same pixel-difference bbox the PNG path uses.
+        probe = io.BytesIO()
+        probe_dpi = 200
+        fig.savefig(probe, format="png", dpi=probe_dpi, facecolor="white")
+        fig.savefig(output, facecolor="white")
+        plt.close(fig)
+        crop_svg_to_content(output, probe, probe_dpi=probe_dpi, padding_in=20 / 600)
+    else:
+        fig.savefig(output, dpi=dpi, facecolor="white")
+        plt.close(fig)
+        trim_png_whitespace(output, padding=20)
     print(f"Saved: {output}")
     if interactive_output is not None:
         save_interactive_plot(gt, trajectories, interactive_output)
@@ -900,9 +950,9 @@ if __name__ == "__main__":
         source_dir = trial_inputs_dir(trial_id)
         output_dir = trial_outputs_dir(trial_id)
         destination = (
-            args.output / f"figure_C_3d_trajectory_{trial_id}.png"
+            args.output / f"figure_C_3d_trajectory_{trial_id}.svg"
             if args.output
-            else output_dir / "figure_C_3d_trajectory.png"
+            else output_dir / "figure_C_3d_trajectory.svg"
         )
         interactive_destination = None
         if not args.no_interactive:

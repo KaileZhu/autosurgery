@@ -67,8 +67,8 @@ FONT_SIZE = 9.5
 
 rcParams.update(
     {
-        "font.family": "Arial",
-        "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
+        "font.family": "sans-serif",
+        "font.sans-serif": ["Arial", "Helvetica", "Liberation Sans", "DejaVu Sans"],
         "font.size": FONT_SIZE,
         "axes.labelsize": FONT_SIZE,
         "axes.labelcolor": TEXT_COLOR,
@@ -357,7 +357,7 @@ def draw_phase_arrows(ax: plt.Axes, data: MotionData) -> None:
             ha="center",
             va="bottom",
             fontsize=FONT_SIZE,
-            fontfamily="Arial",
+            fontfamily="sans-serif",
             color=ANNOTATION,
             clip_on=False,
             zorder=8,
@@ -451,10 +451,10 @@ def output_for_trial(
 ) -> Path:
     suffix = "_2to1" if two_to_one else ""
     if output is None:
-        return trial_outputs_dir(trial_id) / f"figure_B_tissue_motion{suffix}.png"
+        return trial_outputs_dir(trial_id) / f"figure_B_tissue_motion{suffix}.svg"
     if output.suffix:
         return output if not multiple else output.with_stem(f"{output.stem}_{trial_id}")
-    return output / f"figure_B_tissue_motion_{trial_id}{suffix}.png"
+    return output / f"figure_B_tissue_motion_{trial_id}{suffix}.svg"
 
 
 def main() -> None:

@@ -22,7 +22,6 @@ MODULES = {
     "DE": "scripts.figures.figure_de_actionx_phase_velocity",
     "BDE": "scripts.figures.figure_bde_tissue_motion_actionx_velocity",
     "E": "scripts.figures.figure_e_actionx_pairwise",
-    "CE": "scripts.figures.figure_ce_trajectory_actionx_1x2",
 }
 DEFAULT_FIGURES = ("B", "C", "DE", "D", "E")
 TRIALS = (17, 18, 19)

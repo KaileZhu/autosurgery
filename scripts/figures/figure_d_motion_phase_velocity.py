@@ -89,8 +89,8 @@ ORDINAL_WORDS = (
 
 rcParams.update(
     {
-        "font.family": "Arial",
-        "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
+        "font.family": "sans-serif",
+        "font.sans-serif": ["Arial", "Helvetica", "Liberation Sans", "DejaVu Sans"],
         "mathtext.fontset": "custom",
         "mathtext.rm": "Arial",
         "mathtext.it": "Arial:italic",
@@ -605,7 +605,7 @@ def style_rotated_velocity_axis(
         ha="center",
         va="top",
         fontsize=8.5,
-        fontfamily="Arial",
+        fontfamily="sans-serif",
         color="black",
         zorder=6,
     )
@@ -617,7 +617,7 @@ def style_rotated_velocity_axis(
         ha="left",
         va="top",
         fontsize=8.5,
-        fontfamily="Arial",
+        fontfamily="sans-serif",
         color="black",
         zorder=6,
     )
@@ -684,15 +684,15 @@ def output_paths_for_trial(trial_id: int, output: Path | None, multiple: bool) -
     if output is None:
         output_dir = trial_outputs_dir(trial_id)
         return (
-            output_dir / "figure_D_phase_velocity.png",
-            output_dir / "figure_D_phase_velocity_horizontal.png",
+            output_dir / "figure_D_phase_velocity.svg",
+            output_dir / "figure_D_phase_velocity_horizontal.svg",
         )
     if output.suffix:
         normal = output if not multiple else output.with_stem(f"{output.stem}_{trial_id}")
         return normal, normal.with_stem(f"{normal.stem}_horizontal")
     return (
-        output / f"figure_D_phase_velocity_{trial_id}.png",
-        output / f"figure_D_phase_velocity_horizontal_{trial_id}.png",
+        output / f"figure_D_phase_velocity_{trial_id}.svg",
+        output / f"figure_D_phase_velocity_horizontal_{trial_id}.svg",
     )
 
 

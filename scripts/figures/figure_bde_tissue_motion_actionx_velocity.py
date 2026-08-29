@@ -147,10 +147,10 @@ def render(
 
 def output_for_trial(trial_id: int, output: Path | None, multiple: bool) -> Path:
     if output is None:
-        return tissue.trial_outputs_dir(trial_id) / "figure_BDE_tissue_motion_actionx_velocity.png"
+        return tissue.trial_outputs_dir(trial_id) / "figure_BDE_tissue_motion_actionx_velocity.svg"
     if output.suffix:
         return output if not multiple else output.with_stem(f"{output.stem}_{trial_id}")
-    return output / f"figure_BDE_tissue_motion_actionx_velocity_{trial_id}.png"
+    return output / f"figure_BDE_tissue_motion_actionx_velocity_{trial_id}.svg"
 
 
 def parse_args() -> argparse.Namespace:

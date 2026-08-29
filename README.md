@@ -60,7 +60,6 @@ python -m scripts.figures.figure_c_3d_trajectories
 python -m scripts.figures.figure_de_actionx_phase_velocity --all
 python -m scripts.figures.figure_d_motion_phase_velocity --all
 python -m scripts.figures.figure_e_actionx_pairwise --all
-python -m scripts.figures.figure_ce_trajectory_actionx_1x2 --trial 18
 ```
 
 默认从 `data/trials/trial_*/inputs/` 读入，写出到同 trial 的 `outputs/`。
@@ -73,14 +72,13 @@ python -m scripts.figures.figure_ce_trajectory_actionx_1x2 --trial 18
   速度柱合并在一个坐标系里。曲线在左轴（m），速度柱在右轴（m/s）。横轴不标秒数，
   改标呼吸相序数，刻度落在各段中心。
 
-`figure_ce_trajectory_actionx_1x2.py` 是这两张图的 1×2 合版，保留备用。
 
 横轴标签的形式是**全图统一**自动选的：按相邻标签中心间距挑出互不碰撞的最长形式，
 所以 trial 17（7 段）用 `First / Inspiration` 全称，trial 18（11 段）自动降为
 `1st / Insp.`。绝不会在同一行里混用两种形式。
 
-模型配色的唯一来源是 `figure_c_3d_trajectories.COLORS`，`figure_de` / `figure_ce`
-都从它导入，改一处三张图同步。当前用的是 `jewel`（灰翠蓝 / 柔金 / 青瓷 / 酒红，
+模型配色的唯一来源是 `figure_c_3d_trajectories.COLORS`，`figure_de` 等脚本
+都从它导入，改一处全部同步。当前用的是 `jewel`（灰翠蓝 / 柔金 / 青瓷 / 酒红，
 四个降饱和色）。`figure_de --palette {jewel,npg,slate,neutral}` 可以现场比选，
 选定后把色值写回 `figure_c.COLORS` 即可全局生效。
 
@@ -91,7 +89,7 @@ Liberation Sans，排版不会变形。装了真 Arial 后脚本会自动改用�
 sudo apt install -y ttf-mscorefonts-installer && fc-cache -f && rm -f ~/.cache/matplotlib/fontlist-*.json
 ```
 
-`figure_b` / `figure_d` / `figure_de` / `figure_ce` 都支持 `--height`（英寸），只压
+`figure_b` / `figure_d` / `figure_de` 都支持 `--height`（英寸），只压
 绘图框、不动字号。`figure_de` 另有 `--caption` 开关，默认关闭以省高度。
 
 ## 脚本职责
@@ -105,9 +103,7 @@ sudo apt install -y ttf-mscorefonts-installer && fc-cache -f && rm -f ~/.cache/m
 | `figures/figure_d_motion_phase_velocity.py` | Figure D 呼吸相与速度 |
 | `figures/figure_de_actionx_phase_velocity.py` | Action-X 与相位速度合图 |
 | `figures/figure_e_actionx_pairwise.py` | Figure E 模型两两比较 |
-| `figures/figure_ce_trajectory_actionx_1x2.py` | C/DE 的 1×2 备用合版 |
-| `figures/anomaly_probability.py` | 异常分类概率图 |
-| `figures/output_probability.py` | CVS 输出概率图 |
+| `figures/probability_broken_bar.py` | 概率断轴柱状图（`output` 子命令出 CVS 输出概率，`anomaly` 出异常概率+能量分） |
 | `video/annotate_respiratory_phase.py` | 给视频叠加呼吸相标签 |
 | `video/overlay_tissue_motion.py` | 给视频叠加组织运动曲线 |
 

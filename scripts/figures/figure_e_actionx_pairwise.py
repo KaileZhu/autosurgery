@@ -101,8 +101,8 @@ LINEWIDTHS = {"GT": 2.05, "zeroshot": 1.3, "AB": 1.3, "ABC": 1.3, "ABCP": 1.7}
 
 rcParams.update(
     {
-        "font.family": "Arial",
-        "font.sans-serif": ["Arial"],
+        "font.family": "sans-serif",
+        "font.sans-serif": ["Arial", "Liberation Sans", "DejaVu Sans"],
         "mathtext.fontset": "custom",
         "mathtext.rm": "Arial",
         "mathtext.it": "Arial:italic",
@@ -264,64 +264,6 @@ def draw_pair(
 
 
 
-def draw_group(
-    ax: plt.Axes,
-    gt: np.ndarray,
-    predictions: list[tuple[str, np.ndarray]],
-    duration_s: float,
-    *,
-    show_xlabel: bool,
-) -> None:
-    steps = min([len(gt), *(len(prediction) for _, prediction in predictions)])
-    time_s = np.linspace(0.0, duration_s, steps)
-    gt = gt[:steps]
-    plotted_values = [gt]
-
-    ax.plot(
-        time_s,
-        gt,
-        color=COLORS["GT"],
-        lw=LINEWIDTHS["GT"],
-        solid_capstyle="round",
-        zorder=6,
-    )
-    ax.scatter(
-        time_s[-1],
-        gt[-1],
-        s=20,
-        color=COLORS["GT"],
-        edgecolor="white",
-        linewidth=0.55,
-        zorder=7,
-        clip_on=False,
-    )
-
-    for model, prediction in predictions:
-        prediction = prediction[:steps]
-        plotted_values.append(prediction)
-        ax.plot(
-            time_s,
-            prediction,
-            color=COLORS[model],
-            lw=LINEWIDTHS[model],
-            alpha=0.96,
-            solid_capstyle="round",
-            zorder=5,
-        )
-        ax.scatter(
-            time_s[-1],
-            prediction[-1],
-            s=18,
-            color=COLORS[model],
-            edgecolor="white",
-            linewidth=0.55,
-            zorder=7,
-            clip_on=False,
-        )
-
-    style_axis(ax, duration_s, np.concatenate(plotted_values), show_xlabel=show_xlabel)
-
-
 def load_trial_pairs(trial_id: int, k: float) -> list[tuple[str, np.ndarray, np.ndarray]]:
     trial_dir = trial_inputs_dir(trial_id)
     if not trial_dir.is_dir():
@@ -400,160 +342,13 @@ def plot_trial_stack(trial_id: int, output: Path, k: float, dpi: int) -> None:
     save_figure(fig, output, dpi=dpi)
 
 
-def plot_trial_grid_2x2(trial_id: int, output: Path, k: float, dpi: int) -> None:
-    pairs = load_trial_pairs(trial_id, k=k)
-    duration_s = video_duration_s(trial_id)
-    fig, axes = plt.subplots(
-        2,
-        2,
-        figsize=(6.3, 5.1),
-        sharex=True,
-    )
-    axes_flat = axes.ravel()
-    for idx, (ax, (model, gt, prediction)) in enumerate(zip(axes_flat, pairs)):
-        draw_pair(ax, gt, prediction, model, duration_s, show_xlabel=(idx >= 2))
-
-    fig.legend(
-        handles=all_legend_handles(),
-        loc="lower left",
-        bbox_to_anchor=(0.10, 0.932, 0.885, 0.05),
-        ncol=5,
-        mode="expand",
-        frameon=False,
-        handlelength=0.9,
-        columnspacing=0.55,
-        handletextpad=0.32,
-        borderaxespad=0.0,
-        labelspacing=0.05,
-    )
-    fig.subplots_adjust(left=0.10, right=0.985, bottom=0.088, top=0.910, hspace=0.16, wspace=0.22)
-    save_figure(fig, output, dpi=dpi)
-
-
-
-def plot_trial_two_panel(trial_id: int, output: Path, k: float, dpi: int) -> None:
-    pairs = load_trial_pairs(trial_id, k=k)
-    duration_s = video_duration_s(trial_id)
-    pair_by_model = {model: (gt, prediction) for model, gt, prediction in pairs}
-    reference_gt = pairs[0][1]
-
-    groups = [
-        ("zeroshot", "AB"),
-        ("ABC", "ABCP"),
-    ]
-    fig, axes = plt.subplots(
-        1,
-        2,
-        figsize=(6.3, 2.55),
-        sharex=True,
-        sharey=True,
-    )
-
-    for ax, models in zip(axes, groups):
-        predictions = [(model, pair_by_model[model][1]) for model in models]
-        draw_group(ax, reference_gt, predictions, duration_s, show_xlabel=True)
-
-    fig.legend(
-        handles=all_legend_handles(),
-        loc="lower center",
-        bbox_to_anchor=(0.54, 0.855),
-        ncol=5,
-        frameon=False,
-        handlelength=0.9,
-        columnspacing=0.9,
-        handletextpad=0.32,
-        borderaxespad=0.0,
-        labelspacing=0.05,
-    )
-    fig.subplots_adjust(left=0.10, right=0.985, bottom=0.22, top=0.835, wspace=0.12)
-    save_figure(fig, output, dpi=dpi)
-
-
-def plot_trial_merged(trial_id: int, output: Path, k: float, dpi: int) -> None:
-    pairs = load_trial_pairs(trial_id, k=k)
-    duration_s = video_duration_s(trial_id)
-    pair_by_model = {model: (gt, prediction) for model, gt, prediction in pairs}
-    reference_gt = pairs[0][1]
-    models = tuple(MODEL_FILES.keys())
-
-    fig, ax = plt.subplots(figsize=(5.1, 3.0))
-    predictions = [(model, pair_by_model[model][1]) for model in models]
-    draw_group(ax, reference_gt, predictions, duration_s, show_xlabel=True)
-
-    fig.legend(
-        handles=all_legend_handles(),
-        loc="lower center",
-        bbox_to_anchor=(0.53, 0.905),
-        ncol=5,
-        frameon=False,
-        handlelength=0.8,
-        columnspacing=0.65,
-        handletextpad=0.28,
-        borderaxespad=0.0,
-        labelspacing=0.05,
-    )
-    fig.subplots_adjust(left=0.16, right=0.985, bottom=0.15, top=0.84)
-    save_figure(fig, output, dpi=dpi)
-
-def plot_legacy_pair(
-    model: str,
-    gt: np.ndarray,
-    prediction: np.ndarray,
-    duration_s: float,
-    output: Path,
-    dpi: int,
-) -> None:
-    """Write the legacy single-model GT comparison plot."""
-    fig, ax = plt.subplots(figsize=(5.1, 3.0))
-    draw_pair(ax, gt, prediction, model, duration_s, show_xlabel=True)
-
-    handles = [
-        Line2D([0], [0], color=COLORS["GT"], lw=LINEWIDTHS["GT"], label="Demonstration"),
-        Line2D([0], [0], color=COLORS[model], lw=LINEWIDTHS[model], label=DISPLAY_LABELS[model]),
-    ]
-    ax.legend(
-        handles=handles,
-        loc="upper center",
-        bbox_to_anchor=(0.5, 1.18),
-        ncol=2,
-        frameon=False,
-        handlelength=1.7,
-        columnspacing=1.0,
-        borderaxespad=0.0,
-    )
-
-    fig.subplots_adjust(left=0.16, right=0.985, bottom=0.15, top=0.86)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output, dpi=dpi, bbox_inches="tight", pad_inches=0.04)
-    plt.close(fig)
-    print(f"Saved: {output}")
-
-
-def plot_trial_legacy_pairs(trial_id: int, output_dir: Path, k: float, dpi: int) -> None:
-    trial_dir = trial_inputs_dir(trial_id)
-    duration_s = video_duration_s(trial_id)
-    legacy_dir = output_dir / "legacy"
-    for model in MODEL_FILES:
-        gt, prediction = load_model_action_x(trial_dir, model, k=k)
-        output = legacy_dir / f"actionx_gt_vs_{model}.png"
-        plot_legacy_pair(model, gt, prediction, duration_s, output, dpi=dpi)
-
-
 def plot_trial(trial_id: int, output_dir: Path | None, k: float, dpi: int) -> None:
     trial_dir = trial_inputs_dir(trial_id)
     if not trial_dir.is_dir():
         raise FileNotFoundError(f"Missing trial directory: {trial_dir}")
 
     destination_dir = output_dir / f"trial_{trial_id}" if output_dir else trial_outputs_dir(trial_id)
-    stack_output = destination_dir / "figure_E_actionx_models.png"
-    grid_output = destination_dir / "figure_E_actionx_models_2x2.png"
-    two_panel_output = destination_dir / "figure_E_actionx_models_1x2.png"
-    merged_output = destination_dir / "figure_E_actionx_models_merged.png"
-    plot_trial_stack(trial_id, stack_output, k=k, dpi=dpi)
-    plot_trial_grid_2x2(trial_id, grid_output, k=k, dpi=dpi)
-    plot_trial_two_panel(trial_id, two_panel_output, k=k, dpi=dpi)
-    plot_trial_merged(trial_id, merged_output, k=k, dpi=dpi)
-    plot_trial_legacy_pairs(trial_id, destination_dir, k=k, dpi=dpi)
+    plot_trial_stack(trial_id, destination_dir / "figure_E_actionx_models.svg", k=k, dpi=dpi)
 
 
 def parse_args() -> argparse.Namespace:
