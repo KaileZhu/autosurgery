@@ -481,8 +481,13 @@ def draw_panel(
     y_formatter.set_scientific(True)
     y_formatter.set_powerlimits((-2, -2))
     ax.yaxis.set_major_formatter(y_formatter)
-    ax.yaxis.get_offset_text().set_fontfamily(SANS)
-    ax.yaxis.get_offset_text().set_fontsize(FONT_SIZE)
+    y_offset_text = ax.yaxis.get_offset_text()
+    y_offset_text.set_fontfamily(SANS)
+    y_offset_text.set_fontsize(FONT_SIZE)
+    # Centre the scientific-notation multiplier above the top y tick label
+    # instead of leaving it at Matplotlib's default position by the y spine.
+    y_offset_text.set_x(-0.028)
+    y_offset_text.set_horizontalalignment("center")
     # No gridlines: with the phase bands already washing the plot area, Nature
     # house style keeps the field clean and lets the ticks carry the scale.
     ax.set_axisbelow(True)
